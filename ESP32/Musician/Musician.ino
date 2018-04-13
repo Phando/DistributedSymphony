@@ -1,6 +1,7 @@
+#include <TriggerPair.h>
+
 #include <QueueArray.h>
 #include "SymphonyConnection.h"
-#include "Trigger.h"
 
 #define LED_PIN 2
 #define NOTE_PIN 25
@@ -8,14 +9,18 @@
 #define ENABLED 0
 #define DISABLED 1
 
-#define max(a,b) ((a)>(b)?(a):(b))
+#define max(a,b) ((a)>(b)?(a):(b)) 
 #define min(a,b) ((a)<(b)?(a):(b))
 
-const char* ssid     = "herewego";
-const char* password = "photoshop!";
+//const char* ssid     = "herewego";
+//const char* password = "photoshop!";
 
-//const char* ssid     = "Verizon-MiFi6620L-D537";
-//const char* password = "a71745e9";
+const char* ssid     = "Verizon-MiFi6620L-D537";
+const char* password = "a71745e9";
+
+//Store the gate time on the chip
+//Store the clockSkew on the chip
+//store the SSID and PW
 
 SymphonyConnection connection;
 QueueArray <int> notes;
@@ -66,23 +71,10 @@ void setup() {
   ledColor.g = 50;
   ledColor.b = 50;
 
-  dropTest.offset = 10000;
-  dropTest.handler = finishTest;
-
-  alive.on.offset = 5;
-  alive.on.handler = aliveOn;
-  alive.off.offset = 5000;
-  alive.off.handler = aliveOff;
-  
-  gate.on.offset = 500; // Tempo
-  gate.on.handler = gateOpen;
-  gate.off.offset = 50; // GateTime
-  gate.off.handler = gateClose;
-
-  pixel.on.offset = 50;
-  pixel.on.handler = pixelOn;
-  pixel.off.offset = 50;
-  pixel.off.handler = pixelOff;
+  dropTest  = Trigger( finishTest,10000);
+  alive     = TriggerPair( aliveOn, 5, aliveOff, 5000);
+  gate      = TriggerPair( gateOpen, 500, gateClose, 50);
+  pixel     = TriggerPair( pixelOn, 50, pixelOff, 50);
   
 //  handleMessage("DROPTEST");
 //  Serial.println("");
@@ -127,8 +119,8 @@ void handleMessage(String message) {
   if( String(tokens) == "BLINK"){
     blinkCount = 10;
     alive.invalidate();
-    alive.on.offset = 100;
-    alive.off.offset = 100;
+    alive.alphaOffset(100);
+    alive.betaOffset(100);
     alive.execute();
   }
 }
@@ -139,8 +131,8 @@ void beginDropTest(){
   finishTest();
   dropMin = 50000;
   dropMax = 0;
-  dropTest.reschedule();
-  handleMessage("PLAYI:1000:0:" + String(gate.off.offset) + ":0:1:2:3:4");
+  dropTest. reschedule();
+  handleMessage("PLAYI:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
 }
 
 /* ----- Prepare for Play  ---------------------------------------------- */
@@ -154,8 +146,8 @@ void beginPlay(char* tokens){
   tokens = strtok(NULL, ":");
   if(tokens != NULL){
     Serial.println(tokens);
-    gate.on.offset = atoi(tokens);
-    bounceDelay = gate.on.offset/2;
+    gate.alphaOffset(atoi(tokens));
+    bounceDelay = gate.alphaOffset() / 2;
   }
 
   // SCHEDULE
@@ -169,7 +161,7 @@ void beginPlay(char* tokens){
   tokens = strtok(NULL, ":");
   if(tokens != NULL){
     Serial.println(tokens);
-    gate.off.offset = atoi(tokens);
+    gate.betaOffset(atoi(tokens));
   }
 
   // Notes
@@ -181,13 +173,13 @@ void beginPlay(char* tokens){
   
   // Only if there are notes
   if( notes.count() > 0 ) {
-    int startOffset = notes.pop() * gate.on.offset;
+    int startOffset = notes.pop() * gate.alphaOffset();
     if( schedule == 0 ) {
       gate.execute();
     }
     else {
       //startOffset -= deviation;
-      gate.on.scheduleAt(schedule + startOffset);  
+      gate.scheduleAlphaAt(schedule + startOffset);  
     }
   }
   
@@ -214,7 +206,7 @@ void handleImpact() {
     }
     else {
       int note = notes.pop();
-      gate.on.scheduleAt(startTime + (note * gate.on.offset));   
+      gate.scheduleAlphaAt(startTime + (note * gate.alphaOffset()));   
     }
   }
 }
@@ -235,23 +227,23 @@ void finishTest() {
 /* ----- Gate Functions  ---------------------------------------------- */
 
 void gateOpen(){
-  //Serial.println("GateOpen");
+  Serial.println("GateOpen");
   digitalWrite(NOTE_PIN, HIGH);
   dropTime = millis();
-  gate.off.reschedule();
-  lastBounce = dropTime + gate.off.offset + 10; // This fixes instant interrupts
+  gate.rescheduleBeta();
+  lastBounce = dropTime + gate.betaOffset() + 10; // This fixes instant interrupts
   if(startTime == 0){
     startTime = dropTime;
   }
   
  if( !notes.isEmpty() && !dropTest.isActive() ){
     int note = notes.pop();
-    gate.on.scheduleAt(startTime + (note * gate.on.offset));
+    gate.scheduleAlphaAt(startTime + (note * gate.alphaOffset()));
   }
 }
 
 void gateClose(){
-  //Serial.println("GateClose");
+  Serial.println("GateClose");
   digitalWrite(NOTE_PIN, LOW);
 }
 
@@ -259,7 +251,7 @@ void gateClose(){
 
 void pixelOn(){
   //Serial.println("PixelOn");
-  pixel.off.reschedule();  
+  pixel.rescheduleBeta();  
 }
 
 void pixelOff(){
@@ -270,16 +262,16 @@ void pixelOff(){
 
 void aliveOn(){
   if(blinkCount-- == 0){
-    alive.on.offset = 5;
-    alive.off.offset = 5000;   
+    alive.alphaOffset(5);
+    alive.betaOffset(5000);   
   }
   digitalWrite(LED_PIN, LOW);
-  alive.off.reschedule();
+  alive.rescheduleBeta();
 }
 
 void aliveOff(){
   digitalWrite(LED_PIN, HIGH);
-  alive.on.reschedule();
+  alive.rescheduleAlpha();
 }
 
 void loop() {

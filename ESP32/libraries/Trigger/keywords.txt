@@ -1,0 +1,34 @@
+#######################################
+# Syntax Coloring Map For Trigger
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+Trigger		KEYWORD1
+TriggerPair	KEYWORD1
+TriggerFunction	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+execute 		KEYWORD2
+invalidate		KEYWORD2
+isActive		KEYWORD2
+tick			KEYWORD2
+
+reschedule 		KEYWORD2
+rescheduleAlpha KEYWORD2
+rescheduleBeta	KEYWORD2
+scheduleAt 		KEYWORD2
+scheduleAlphaAt	KEYWORD2
+scheduleBetaAt	KEYWORD2
+scheduleIn 		KEYWORD2
+scheduleAlphaIn KEYWORD2
+scheduleBetaIn 	KEYWORD2
+
+alphaOffset		KEYWORD2
+betaOffset		KEYWORD2
+

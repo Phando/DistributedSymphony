@@ -3,20 +3,20 @@
 #include <QueueArray.h>
 #include "SymphonyConnection.h"
 
-#define LED_PIN 2
-#define NOTE_PIN 25
-#define MIC_PIN 15
-#define ENABLED 0
+#define LED_PIN 20
+#define NOTE_PIN 26
+#define MIC_PIN 23
+#define ENABLED 0 
 #define DISABLED 1
 
 #define max(a,b) ((a)>(b)?(a):(b)) 
 #define min(a,b) ((a)<(b)?(a):(b))
 
-//const char* ssid     = "herewego";
-//const char* password = "photoshop!";
+const char* ssid     = "herewego";
+const char* password = "photoshop!";
 
-const char* ssid     = "Verizon-MiFi6620L-D537";
-const char* password = "a71745e9";
+//const char* ssid     = "Verizon-MiFi6620L-D537";
+//const char* password = "a71745e9";
 
 //Store the gate time on the chip
 //Store the clockSkew on the chip
@@ -106,7 +106,7 @@ void handleMessage(String message) {
   if( String(tokens) == "DROPTEST"){
     beginDropTest();
   }
-  if( String(tokens) == "PLAYI"){
+  if( String(tokens) == "PLAY"){
     beginPlay(tokens);
   }
   if( String(tokens) == "DISABLE"){
@@ -132,7 +132,7 @@ void beginDropTest(){
   dropMin = 50000;
   dropMax = 0;
   dropTest. reschedule();
-  handleMessage("PLAYI:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
+  handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
 }
 
 /* ----- Prepare for Play  ---------------------------------------------- */

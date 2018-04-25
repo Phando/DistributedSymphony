@@ -1,9 +1,10 @@
+#include <Adafruit_NeoPixel.h>
 #include <TriggerPair.h>
-
 #include <QueueArray.h>
+
 #include "SymphonyConnection.h"
 
-#define LED_PIN 20
+#define LED_PIN 12
 #define NOTE_PIN 26
 #define MIC_PIN 23
 #define ENABLED 0 
@@ -23,18 +24,12 @@ const char* password = "photoshop!";
 //store the SSID and PW
 
 SymphonyConnection connection;
-QueueArray <int> notes;
 
-typedef struct color
-  {
-    int r;
-    int g;
-    int b;
-  };
+QueueArray <int> notes;
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 int bounceDelay = 250;
 
-color ledColor;
 TriggerPair alive, gate, flash, pixel;
 Trigger dropTest;
 
@@ -46,15 +41,17 @@ unsigned long deviation = 0;
 unsigned long startTime = 0;
 
 void setup() {
+  strip.begin();
+  strip.setBrightness(50);
+  strip.setPixelColor(0,strip.Color(50,10,10));
+  strip.show();
+  strip.show();
+  
   Serial.begin(115200);
   pinMode(NOTE_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
   pinMode(MIC_PIN, INPUT_PULLUP);
-
-  Serial.begin(115200);
-  Serial.println();
-  
   notes.setPrinter (Serial);
+  
   attachInterrupt(digitalPinToInterrupt(MIC_PIN), handleImpact, RISING);
     
   // Connect to network.
@@ -67,15 +64,12 @@ void setup() {
       Serial.print(".");
   }
 
-  ledColor.r = 50;
-  ledColor.g = 50;
-  ledColor.b = 50;
-
   dropTest  = Trigger( finishTest,10000);
-  alive     = TriggerPair( aliveOn, 5, aliveOff, 5000);
+  alive     = TriggerPair( aliveOn, 5000, aliveOff, 5);
   gate      = TriggerPair( gateOpen, 500, gateClose, 50);
-  pixel     = TriggerPair( pixelOn, 50, pixelOff, 50);
-  
+  pixel     = TriggerPair( pixelOn, 100, pixelOff, 50);
+
+  alive.execute();
 //  handleMessage("DROPTEST");
 //  Serial.println("");
 //  Serial.println("\nWiFi connected");
@@ -88,8 +82,6 @@ void setup() {
   } else {
     Serial.println("Unsuccessful Symphony Connection");
   }
-  
-  alive.execute();
 }
 
 /**
@@ -103,7 +95,7 @@ void handleMessage(String message) {
   message.toCharArray(tokens, len);
   tokens = strtok(tokens, ":");
   
-  if( String(tokens) == "DROPTEST"){
+  if( String(tokens) == "CALIBRATE"){
     beginDropTest();
   }
   if( String(tokens) == "PLAY"){
@@ -116,8 +108,8 @@ void handleMessage(String message) {
     // TODO enable the user button
   }
   
-  if( String(tokens) == "BLINK"){
-    blinkCount = 10;
+  if( String(tokens) == "ALIVE"){
+    blinkCount = 20;
     alive.invalidate();
     alive.alphaOffset(100);
     alive.betaOffset(100);
@@ -132,7 +124,7 @@ void beginDropTest(){
   dropMin = 50000;
   dropMax = 0;
   dropTest. reschedule();
-  handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
+  handleMessage("PLAY:1500:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
 }
 
 /* ----- Prepare for Play  ---------------------------------------------- */
@@ -250,27 +242,47 @@ void gateClose(){
 /* ----- Onboard Neopixel ------------------------------------------ */
 
 void pixelOn(){
-  //Serial.println("PixelOn");
-  pixel.rescheduleBeta();  
+  Serial.println("PixelOn");
+  strip.setBrightness(100);
+  strip.setPixelColor(0, strip.Color(20,200,20));
+  strip.show();
+  strip.show();
+  pixel.rescheduleBeta();
 }
 
 void pixelOff(){
-  //Serial.println("PixelOff");
+  Serial.println("PixelOff");
+  aliveOff();
 }
 
 /* ----- Onboard LED  ---------------------------------------------- */
 
 void aliveOn(){
-  if(blinkCount-- == 0){
-    alive.alphaOffset(5);
-    alive.betaOffset(5000);   
+  if( pixel.isActive() ){
+      return;
   }
-  digitalWrite(LED_PIN, LOW);
+  
+  if(blinkCount > 0){
+    blinkCount--;
+    strip.setBrightness(150);
+    strip.setPixelColor(0, strip.Color(150,50,50));
+  }
+  else {
+    strip.setBrightness(10);
+    strip.setPixelColor(0, strip.Color(23,152,193));
+    alive.alphaOffset(5000);
+    alive.betaOffset(5);   
+  }
+  
+  strip.show();
+  strip.show();
   alive.rescheduleBeta();
 }
 
 void aliveOff(){
-  digitalWrite(LED_PIN, HIGH);
+  strip.setPixelColor(0, 0, 0, 0, 0);
+  strip.show();
+  strip.show();
   alive.rescheduleAlpha();
 }
 

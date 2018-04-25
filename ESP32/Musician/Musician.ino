@@ -34,6 +34,7 @@ TriggerPair alive, gate, flash, pixel;
 Trigger dropTest;
 
 unsigned long lastBounce = 0;  
+bool shouldReport = false;
 
 int blinkCount, dropMin, dropMax;
 unsigned long dropTime = 0; 
@@ -195,6 +196,7 @@ void handleImpact() {
     if( notes.isEmpty() ){
       dropTest.invalidate();
       finishTest();
+      shouldReport = true;
     }
     else {
       int note = notes.pop();
@@ -208,12 +210,10 @@ void handleImpact() {
 void finishTest() {
   gate.invalidate();
   deviation = (dropMax - dropMin) / 2;
-  Serial.println(String(dropMin) + " : " + String(dropMax) + " : " + String(deviation));
   
   while( !notes.isEmpty() ){
     notes.pop();
-  }
-  // TODO : send score to server and screen;   
+  } 
 }
 
 /* ----- Gate Functions  ---------------------------------------------- */
@@ -291,4 +291,9 @@ void loop() {
   dropTest.tick();
   gate.tick();
   pixel.tick();
+  if( shouldReport ){
+    shouldReport = false;
+    Serial.println("Reporting deviation - " + String(dropMin) + " : " + String(dropMax) + " : " + String(deviation));
+    connection.sendMessage("SET:deviation=" + String(deviation));
+  }
 }

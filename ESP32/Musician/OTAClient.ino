@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <Update.h>
 #include <HTTPClient.h>
+#include "config.h"
 
 WiFiClient otaClient;
 
@@ -9,8 +10,6 @@ bool isValidContentType = false;
 
 int port = 80; 
 float targetVersion = 0.0;
-String host = "project-518.herokuapp.com";
-String bin = "/ota";
 
 // Utility to extract header value from headers
 String getHeaderValue(String header, String headerName) {
@@ -18,10 +17,10 @@ String getHeaderValue(String header, String headerName) {
 }
 
 void checkVersion(){
-  Serial.println("Checking sketch version");
+  Serial.println("Checking sketch vsersion.");
   
   HTTPClient http;
-  http.begin("https://raw.githubusercontent.com/Phando/DistributedSymphony/development/version.txt");
+  http.begin("http://" + OTA_HOST + OTA_VERSION);
   int httpCode = http.GET();                             
   
   if (httpCode > 0) { //Check for the returning code
@@ -30,41 +29,41 @@ void checkVersion(){
         float chipVersion = prefs.getFloat("sketchVersion", 0.0);
         Serial.println(String(chipVersion) + " : " + String(targetVersion));
         if ( chipVersion < targetVersion ){
-           Serial.println("Get new Version");
+           Serial.println("Updating sketch to version : " + String(targetVersion));
            execOTA();
         } else {
-           Serial.println("Good version");
+           Serial.println("Running with sketch version : " + String(targetVersion));
         }
+      }
+      else {
+        Serial.println("Error getting "+ OTA_VERSION +" - "+ String(httpCode));
       }
     }
   else {
     Serial.println("Error on HTTP request");
-    //preferences.clear();
-    //preferences.remove("counter");
   }
   http.end(); //Free the resources
-    
 }
 
 
 // OTA Logic 
 void execOTA() {
-  Serial.println("Connecting to: " + String(host));
-  // Connect to S3
-  if (otaClient.connect(host.c_str(), port)) {
+  Serial.println("Connecting to: " + OTA_HOST);
+  // Connect to OTA Server
+  if (otaClient.connect(OTA_HOST.c_str(), port)) {
     // Connection Succeed.
     // Fecthing the bin
-    Serial.println("Fetching Bin: " + String(bin));
+    Serial.println("Fetching Bin: " + OTA_SKETCH);
 
     // Get the contents of the bin file
-    otaClient.print(String("GET ") + bin + " HTTP/1.1\r\n" +
-                 "Host: " + host + "\r\n" +
+    otaClient.print(String("GET ") + OTA_SKETCH + " HTTP/1.1\r\n" +
+                 "Host: " + OTA_HOST + "\r\n" +
                  "Cache-Control: no-cache\r\n" +
                  "Connection: close\r\n\r\n");
 
     // Check what is being sent
-    //    Serial.print(String("GET ") + bin + " HTTP/1.1\r\n" +
-    //                 "Host: " + host + "\r\n" +
+    //    Serial.print(String("GET ") + OTA_SKETCH + " HTTP/1.1\r\n" +
+    //                 "Host: " + OTA_HOST + "\r\n" +
     //                 "Cache-Control: no-cache\r\n" +
     //                 "Connection: close\r\n\r\n");
 
@@ -101,18 +100,13 @@ void execOTA() {
       // remove space, to check if the line is end of headers
       line.trim();
 
-      // if the the line is empty,
-      // this is end of headers
-      // break the while and feed the
-      // remaining `client` to the
-      // Update.writeStream();
+      // if the the line is empty, this is end of headers break the while and feed the remaining `client` to the Update.writeStream();
       if (!line.length()) {
         //headers ended
         break; // and get the OTA started
       }
 
-      // Check if the HTTP Response is 200
-      // else break and Exit Update
+      // Check if the HTTP Response is 200 else break and Exit Update
       if (line.startsWith("HTTP/1.1")) {
         if (line.indexOf("200") < 0) {
           Serial.println("Got a non 200 status code from server. Exiting OTA Update.");
@@ -120,8 +114,7 @@ void execOTA() {
         }
       }
 
-      // extract headers here
-      // Start with content length
+      // extract headers here start with content length
       if (line.startsWith("Content-Length: ")) {
         contentLength = atoi((getHeaderValue(line, "Content-Length: ")).c_str());
         Serial.println("Got " + String(contentLength) + " bytes from server");
@@ -137,10 +130,10 @@ void execOTA() {
       }
     }
   } else {
-    // Connect to S3 failed
+    // Connect to OTA host failed
     // May be try?
     // Probably a choppy network?
-    Serial.println("Connection to " + String(host) + " failed. Please check your setup");
+    Serial.println("Connection to " + OTA_HOST + " failed. Please check your setup");
     // retry??
     // execOTA();
   }

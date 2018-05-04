@@ -1,16 +1,10 @@
 
+
 #include <TriggerPair.h>
 #include <QueueArray.h>
-#include <Preferences.h>
+
 #include "SymphonyConnection.h"
-
-#define NOTE_PIN 26
-#define MIC_PIN 23
-#define ENABLED 0 
-#define DISABLED 1
-
-#define max(a,b) ((a)>(b)?(a):(b)) 
-#define min(a,b) ((a)<(b)?(a):(b))
+#include "config.h"
 
 SymphonyConnection connection;
 
@@ -20,20 +14,13 @@ SymphonyConnection connection;
 const char* ssid     = "Verizon-MiFi6620L-D537";
 const char* password = "a71745e9";
 
-//Store the gate time on the chip
-//Store the clockSkew on the chip
-//store the SSID and PW
-
-Preferences prefs;
 QueueArray <int> notes;
-
-int bounceDelay = 250;
-
 TriggerPair gate;
 Trigger dropTest;
 
-unsigned long lastBounce = 0;  
 bool shouldReport = false;
+int bounceDelay = 250;
+unsigned long lastBounce = 0;  
 
 int dropMin, dropMax;
 unsigned long dropTime = 0; 
@@ -41,9 +28,13 @@ unsigned long deviation = 0;
 unsigned long startTime = 0;
 
 void setup() {
-  prefs.begin("distributed", false);
-
   Serial.begin(115200);
+  delay(100);
+  
+  prefs.begin("distributed", false);
+  pixelSetup();
+  doPixel();
+  
   pinMode(NOTE_PIN, OUTPUT);
   pinMode(MIC_PIN, INPUT_PULLUP);
   notes.setPrinter (Serial);
@@ -53,8 +44,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(MIC_PIN), handleImpact, RISING);
     
   // Connect to network.
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.print("Connecting to " + String(ssid));
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -62,19 +52,18 @@ void setup() {
       Serial.print(".");
   }
 
-  Serial.println("");
-  Serial.println("\nWiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  
-  checkVersion();
+  Serial.println("\n\nWiFi connected\n IP address: " + String(WiFi.localIP()));
+  //checkVersion();
+
   connection.onMessage(handleMessage);
 
   if (connection.connect()) {
-    Serial.println("Successfull Symphony Connection");
+    Serial.println("Successfully established Symphony Connection");
   } else {
-    Serial.println("Unsuccessful Symphony Connection");
+    Serial.println("Failed to establish Symphony Connection");
   }
+  
+  handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
 }
 
 /**

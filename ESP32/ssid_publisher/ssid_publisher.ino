@@ -15,9 +15,7 @@
 void setup() {
   Serial.begin(115200);
   Serial.println("Starting BLE work!");
-  BLEDevice::setPower(ESP_PWR_LVL_N14);
   BLEDevice::init("SymphonyConductor");
-  Serial.println("After init!");
   
   Serial.print("BLE ADDRESS");
   Serial.println(BLEDevice::getAddress().toString().c_str());

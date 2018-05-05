@@ -1,17 +1,16 @@
-
-
 #include <TriggerPair.h>
 #include <QueueArray.h>
 
 #include "SymphonyConnection.h"
+#include "OTAManager.h"
 #include "config.h"
 
 SymphonyConnection connection;
 
-//const char* ssid     = "herewego";
+const char* ssid = "herewego";
 //const char* password = "photoshop!";
 
-const char* ssid     = "Verizon-MiFi6620L-D537";
+//const char* ssid     = "Verizon-MiFi6620L-D537";
 const char* password = "a71745e9";
 
 QueueArray <int> notes;
@@ -31,7 +30,8 @@ void setup() {
   Serial.begin(115200);
   delay(100);
   
-  prefs.begin("distributed", false);
+  OTAManager::getInstance().start();
+  
   pixelSetup();
   doPixel();
   
@@ -45,11 +45,12 @@ void setup() {
     
   // Connect to network.
   Serial.print("Connecting to " + String(ssid));
+  
+  WiFi.onEvent(WiFiEvent);
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.print(".");
+      delay(5);
   }
 
   Serial.println("\n\nWiFi connected\n IP address: " + String(WiFi.localIP()));
@@ -65,6 +66,23 @@ void setup() {
   
   handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
 }
+
+void WiFiEvent(WiFiEvent_t event)
+{
+    Serial.printf("[WiFi-event] event: %d\n", event);
+
+    switch(event) {
+    case SYSTEM_EVENT_STA_GOT_IP:
+        Serial.println("WiFi connected");
+        Serial.println("IP address: ");
+        Serial.println(WiFi.localIP());
+        break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+        Serial.println("WiFi lost connection");
+        break;
+    }
+}
+
 
 /**
  * This callback will be in invoked for messages from server.

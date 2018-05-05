@@ -17,5 +17,4 @@ const String OTA_HOST = "ffe80891.ngrok.io"; //project-518.herokuapp.com
 const String OTA_SKETCH = "/sketch.ino.bin";
 const String OTA_VERSION = "/version";
 
-
 #endif

@@ -4,6 +4,7 @@
 #include <QueueArray.h>
 
 #include "SymphonyConnection.h"
+#include "OTAManager.h"
 #include "config.h"
 
 SymphonyConnection connection;
@@ -31,9 +32,9 @@ void setup() {
   Serial.begin(115200);
   delay(100);
   
-  prefs.begin("distributed", false);
-  pixelSetup();
-  doPixel();
+  //prefs.begin("distributed", false);
+  //pixelSetup();
+  //doPixel();
   
   pinMode(NOTE_PIN, OUTPUT);
   pinMode(MIC_PIN, INPUT_PULLUP);
@@ -42,28 +43,29 @@ void setup() {
   dropTest  = Trigger( finishTest,10000);
   gate      = TriggerPair( gateOpen, 500, gateClose, 50);
   attachInterrupt(digitalPinToInterrupt(MIC_PIN), handleImpact, RISING);
-    
+
+  OTAManager::getInstance().start();
   // Connect to network.
-  Serial.print("Connecting to " + String(ssid));
-  WiFi.begin(ssid, password);
+  //Serial.print("Connecting to " + String(ssid));
+  //WiFi.begin(ssid, password);
 
-  while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.print(".");
-  }
+  //while (WiFi.status() != WL_CONNECTED) {
+  //    delay(500);
+  //    Serial.print(".");
+  //}
 
-  Serial.println("\n\nWiFi connected\n IP address: " + String(WiFi.localIP()));
+  //Serial.println("\n\nWiFi connected\n IP address: " + String(WiFi.localIP()));
   //checkVersion();
 
-  connection.onMessage(handleMessage);
+  //connection.onMessage(handleMessage);
 
-  if (connection.connect()) {
-    Serial.println("Successfully established Symphony Connection");
-  } else {
-    Serial.println("Failed to establish Symphony Connection");
-  }
+  //if (connection.connect()) {
+  //  Serial.println("Successfully established Symphony Connection");
+  //} else {
+  //  Serial.println("Failed to establish Symphony Connection");
+  //}
   
-  handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
+  //handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
 }
 
 /**

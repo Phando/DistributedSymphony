@@ -137,7 +137,7 @@ pico32.menu.DebugLevel.verbose.build.code_debug=5
 force32.name=Salesforce32-ESP32
 
 force32.upload.tool=esptool
-force32.upload.maximum_size=2062336
+force32.upload.maximum_size=2031616
 force32.upload.maximum_data_size=294912
 force32.upload.wait_for_upload_port=true
 

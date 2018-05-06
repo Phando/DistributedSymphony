@@ -1,5 +1,3 @@
-
-
 #include <TriggerPair.h>
 #include <QueueArray.h>
 

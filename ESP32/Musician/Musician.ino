@@ -7,12 +7,6 @@
 
 SymphonyConnection connection;
 
-//const char* ssid     = "herewego";
-//const char* password = "photoshop!";
-
-const char* ssid     = "Verizon-MiFi6620L-D537";
-const char* password = "a71745e9";
-
 QueueArray <int> notes;
 TriggerPair gate;
 Trigger dropTest;
@@ -168,8 +162,8 @@ void handleImpact() {
   
   if( dropTest.isActive() ) {
     dropTime = millis() - dropTime;
-    dropMin = min(dropMin, dropTime);
-    dropMax = max(dropMax, dropTime);  
+    dropMin = _min(dropMin, dropTime);
+    dropMax = _max(dropMax, dropTime);  
     
     if( notes.isEmpty() ){
       dropTest.invalidate();
@@ -229,4 +223,6 @@ void loop() {
     Serial.println("Reporting deviation - " + String(dropMin) + " : " + String(dropMax) + " : " + String(deviation));
     connection.sendMessage("SET:deviation=" + String(deviation));
   }
+  
+  //vTaskDelay(portMAX_DELAY);
 }

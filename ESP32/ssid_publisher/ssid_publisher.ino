@@ -12,8 +12,15 @@
 #define SSID_UUID           "cd10d9cc-f8d5-468d-89a1-aac3149ab4f9"
 #define PASS_UUID           "d8b8a3e7-2361-4b67-bf51-40b1efd340c0"
 
+//#define SERVICE_SSID        "herewego"
+//#define SERVICE_PASS        "photoshop!"
+
+#define SERVICE_SSID        "Verizon-MiFi6620L-D537"
+#define SERVICE_PASS        "a71745e9"
+
 void setup() {
   Serial.begin(115200);
+  delay(100);
   Serial.println("Starting BLE work!");
   BLEDevice::init("SymphonyConductor");
   
@@ -29,16 +36,16 @@ void setup() {
                                          PASS_UUID,
                                          BLECharacteristic::PROPERTY_READ
                                        );
-  ssidCharacteristic->setValue("herewego");
-  passwordCharacteristic->setValue("photoshop!");
+  ssidCharacteristic->setValue(SERVICE_SSID);
+  passwordCharacteristic->setValue(SERVICE_PASS);
   pService->start();
   BLEAdvertising *pAdvertising = pServer->getAdvertising();
   pAdvertising->addServiceUUID(SERVICE_UUID);
   pAdvertising->start();
-  Serial.println("Characteristic defined! Now you can read it in your phone!");
+  Serial.println("Characteristic defined! Now you can read it!");
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  delay(100);
+  Serial.println("Characteristic Server Alive.");
+  delay(1000);
 }

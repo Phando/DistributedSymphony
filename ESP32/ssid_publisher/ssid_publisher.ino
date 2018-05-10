@@ -12,7 +12,7 @@
 #define SSID_UUID           "cd10d9cc-f8d5-468d-89a1-aac3149ab4f9"
 #define PASS_UUID           "d8b8a3e7-2361-4b67-bf51-40b1efd340c0"
 
-//#define SERVICE_SSID        "herewego"
+//#define SERVICE_SSID        "Rachel's Network"
 //#define SERVICE_PASS        "photoshop!"
 
 #define SERVICE_SSID        "Verizon-MiFi6620L-D537"
@@ -47,5 +47,5 @@ void setup() {
 
 void loop() {
   Serial.println("Characteristic Server Alive.");
-  delay(1000);
+  delay(10000);
 }

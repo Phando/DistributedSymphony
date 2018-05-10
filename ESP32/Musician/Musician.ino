@@ -1,70 +1,86 @@
-#include <TriggerPair.h>
 #include <QueueArray.h>
+#include <esp_log.h>
 
-#include "SymphonyConnection.h"
-#include "OTAManager.h"
+#include <SymphonyConnection.h>
+#include <OTAManager.h>
 #include "config.h"
+
+#define BUT_PIN 22
+#define NOTE_PIN 26
+#define MIC_PIN 23
+#define ENABLED 0 
+#define DISABLED 1
+
+static const char* LOG_TAG = "Musician";
 
 SymphonyConnection connection;
 
 QueueArray <int> notes;
-TriggerPair gate;
-Trigger dropTest;
+Ticker gateCloseTask, gateOpenTask, reportTask;
 
-bool shouldReport = false;
-int bounceDelay = 250;
-unsigned long lastBounce = 0;  
+bool dropTest = false;
+
+// Interrupts and debouncing
+unsigned long tempo = 300;
+unsigned long bounceDelay = 150;
+unsigned long lastButtonTime = 0;  // the last time the output pin was toggled
+unsigned long lastImpactTime = 0;
+unsigned long lastTouch1Time = 0;
+unsigned long lastTouch2Time = 0;  
+
 
 int dropMin, dropMax;
 unsigned long dropTime = 0; 
 unsigned long deviation = 0; 
+
+unsigned long scheduleTime = 0;
 unsigned long startTime = 0;
 
+unsigned long gateTime = 100;
+
 void setup() {
+  ESP_LOGI(LOG_TAG,"Setup");
   Serial.begin(115200);
   delay(100);
-  
-  //prefs.begin("distributed", false);
-  //pixelSetup();
-  //doPixel();
+  Serial.print("");
+
+  startPixel();
+  delay(10000);
+  setIndicating();
+  delay(10000);
+  setAlerting();
+  /*
+  //OTAManager::getInstance().clearPreferences();
+  OTAManager::getInstance().start();
   
   pinMode(NOTE_PIN, OUTPUT);
   pinMode(MIC_PIN, INPUT_PULLUP);
   notes.setPrinter (Serial);
-  
-  dropTest  = Trigger( finishTest,10000);
-  gate      = TriggerPair( gateOpen, 500, gateClose, 50);
+
+  // Setting up interrupts
+  attachInterrupt(digitalPinToInterrupt(BUT_PIN), handleButton, RISING);
   attachInterrupt(digitalPinToInterrupt(MIC_PIN), handleImpact, RISING);
+  touchAttachInterrupt(T2, gotTouch1, (10+touchRead(T2))/2);
+  touchAttachInterrupt(T3, gotTouch2, (10+touchRead(T3))/2);
 
-  OTAManager::getInstance().start();
-  // Connect to network.
-  //Serial.print("Connecting to " + String(ssid));
-  //WiFi.begin(ssid, password);
-
-  //while (WiFi.status() != WL_CONNECTED) {
-  //    delay(500);
-  //    Serial.print(".");
-  //}
-
-  //Serial.println("\n\nWiFi connected\n IP address: " + String(WiFi.localIP()));
-  //checkVersion();
-
-  //connection.onMessage(handleMessage);
-
-  //if (connection.connect()) {
-  //  Serial.println("Successfully established Symphony Connection");
-  //} else {
-  //  Serial.println("Failed to establish Symphony Connection");
-  //}
+  delay(15000);
+  ESP_LOGI(LOG_TAG,"Connecting to Symphony");
+  connection.onMessage(handleMessage);
   
-  //handleMessage("PLAY:1000:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
+  if (connection.connect()) {
+    ESP_LOGI(LOG_TAG,"Successfully established Symphony Connection");
+    
+  } else {
+    ESP_LOGI(LOG_TAG,"Failed to establish Symphony Connection");
+  }
+  */
 }
 
 /**
  * This callback will be in invoked for messages from server.
  */
 void handleMessage(String message) {
-  Serial.println("Message from server: " + String(message));
+  ESP_LOGI(LOG_TAG,"Message from server: %s", message);
   
   int len = message.length() + 1;
   char *tokens = new char[len];
@@ -87,47 +103,51 @@ void handleMessage(String message) {
   }
   
   if( String(tokens) == "ALIVE"){
-    doAlive();
+    //doAlive();
   }
 }
 
 /* ----- Prepare for Test  ---------------------------------------------- */
 
 void beginDropTest(){
-  finishTest();
+  dropTest = true;
   dropMin = 50000;
   dropMax = 0;
-  dropTest. reschedule();
-  handleMessage("PLAY:1500:0:" + String(gate.betaOffset()) + ":0:1:2:3:4");
+  handleMessage("PLAY:1500:0:" + String(gateTime) + ":0:1:2:3:4");
 }
 
 /* ----- Prepare for Play  ---------------------------------------------- */
 
 void beginPlay(char* tokens){
-  finishTest();
+  gateCloseTask.detach();
+  gateOpenTask.detach();
   startTime = 0;
-  int schedule = 0;
+  scheduleTime = 0;
 
+  while( !notes.isEmpty() ){
+    notes.pop();
+  } 
+  
   // TEMPO
   tokens = strtok(NULL, ":");
   if(tokens != NULL){
-    Serial.println(tokens);
-    gate.alphaOffset(atoi(tokens));
-    bounceDelay = gate.alphaOffset() / 2;
+    ESP_LOGI(LOG_TAG,"Tempo: %s", tokens);
+    tempo = atoi(tokens);
+    bounceDelay = tempo / 2;
   }
 
   // SCHEDULE
   tokens = strtok(NULL, ":");
   if(tokens != NULL){
-    Serial.println(tokens);
-    schedule = atoi(tokens);
+    ESP_LOGI(LOG_TAG,"Start Time: %s", tokens);
+    scheduleTime = atoi(tokens);
   }
 
   // Gate Time
   tokens = strtok(NULL, ":");
   if(tokens != NULL){
-    Serial.println(tokens);
-    gate.betaOffset(atoi(tokens));
+    ESP_LOGI(LOG_TAG,"Gate Time: %s", tokens);
+    gateTime = atoi(tokens);
   }
 
   // Notes
@@ -137,92 +157,110 @@ void beginPlay(char* tokens){
     tokens = strtok(NULL, ":"); 
   }
   
-  // Only if there are notes
+  // If there are notes play them
   if( notes.count() > 0 ) {
-    int startOffset = notes.pop() * gate.alphaOffset();
-    if( schedule == 0 ) {
-      gate.execute();
+    int nextNote = notes.pop(); // Get the first note and start
+    startTime = millis();
+    
+    if( scheduleTime == 0 ) {
+      gateOpen();
     }
     else {
-      //startOffset -= deviation;
-      gate.scheduleAlphaAt(schedule + startOffset);  
+      scheduleTime += nextNote * tempo;
+      scheduleTime -= startTime + deviation;
+      gateOpenTask.once_ms(scheduleTime, gateOpen);
     }
   }
-  
 }
 
-/* ----- Impact Handler ------------------------------------------ */
+/* ------------------------------------------------------------------- */
+/* ----- Interrupt Handlers ------------------------------------------ */
+/* ------------------------------------------------------------------- */
 
-void handleImpact() {
-  if(lastBounce > millis()) return; 
-
-  Serial.println(millis() - dropTime);
-  lastBounce = millis() + bounceDelay;
-  doPixel();
+/* ------------------------------------------------------------------- */
+void gotTouch1(){
+  if (lastTouch1Time > millis()) return;
+  lastTouch1Time = 250 + millis();
   
-  if( dropTest.isActive() ) {
+  gateTime = _max(40, gateTime - 10);
+  Serial.println("TOUCH1 : "+ String(gateTime));
+}
+
+/* ------------------------------------------------------------------- */
+void gotTouch2(){
+  if (lastTouch2Time > millis()) return;
+  lastTouch2Time = 250 + millis();
+  
+  gateTime = _min(200, gateTime + 10);
+  Serial.println("TOUCH2 : "+ String(gateTime));
+}
+
+/* ------------------------------------------------------------------- */
+void handleButton() {
+  if (lastButtonTime > millis()) return;
+  
+  lastButtonTime = bounceDelay + millis();
+  gateOpen();
+}
+
+/* ------------------------------------------------------------------- */
+void handleImpact() {
+  if(lastImpactTime > millis()) return; 
+  
+  lastImpactTime = bounceDelay + millis();
+  ESP_LOGI(LOG_TAG,"Impact at: %d", millis() - dropTime);
+  
+  //doPixel();
+  
+  if( dropTest ) {
     dropTime = millis() - dropTime;
     dropMin = _min(dropMin, dropTime);
     dropMax = _max(dropMax, dropTime);  
     
     if( notes.isEmpty() ){
-      dropTest.invalidate();
-      finishTest();
-      shouldReport = true;
+      dropTest = false;
+      deviation = (dropMax - dropMin) / 2;
+      reportTask.once_ms(100, sendReport);
     }
     else {
-      int note = notes.pop();
-      gate.scheduleAlphaAt(startTime + (note * gate.alphaOffset()));   
+      int nextNote = notes.pop();
+      gateOpenTask.once_ms(tempo, gateOpen);
     }
   }
 }
 
-/* ----- Finish Test  ---------------------------------------------- */
-
-void finishTest() {
-  gate.invalidate();
-  deviation = (dropMax - dropMin) / 2;
-  
-  while( !notes.isEmpty() ){
-    notes.pop();
-  } 
-}
-
-/* ----- Gate Functions  ---------------------------------------------- */
+/* ----- Gate Open  ---------------------------------------------- */
 
 void gateOpen(){
-  Serial.println("GateOpen");
-  digitalWrite(NOTE_PIN, HIGH);
   dropTime = millis();
-  gate.rescheduleBeta();
-  lastBounce = dropTime + gate.betaOffset() + 10; // This fixes instant interrupts
-  if(startTime == 0){
-    startTime = dropTime;
-  }
+  digitalWrite(NOTE_PIN, HIGH);
+  gateCloseTask.once_ms(gateTime, gateClose);
   
- if( !notes.isEmpty() && !dropTest.isActive() ){
-    int note = notes.pop();
-    gate.scheduleAlphaAt(startTime + (note * gate.alphaOffset()));
+  ESP_LOGI(LOG_TAG,"GateOpen Time: %d", dropTime);
+  lastImpactTime = dropTime + 10; // This fixes instant interrupts
+  
+  if( !notes.isEmpty() && !dropTest ){
+    int nextNote = notes.pop();
+    gateOpenTask.once_ms((startTime-dropTime)+(nextNote*tempo), gateOpen);
   }
 }
 
+/* ----- Gate Close  ---------------------------------------------- */
+
 void gateClose(){
-  Serial.println("GateClose");
+  ESP_LOGI(LOG_TAG,"GateClose Time: %d", millis());
   digitalWrite(NOTE_PIN, LOW);
+}
+
+/* ----- Send Report  ---------------------------------------------- */
+
+void sendReport(){
+  ESP_LOGI(LOG_TAG,"Reporting deviation - %d : %d : %d", dropMin, dropMax, deviation);
+  connection.sendMessage("SET:deviation=" + String(deviation));
 }
 
 /* ----- Main Loop  ---------------------------------------------- */
 
 void loop() {
-  pixelLoop();
-  dropTest.tick();
-  gate.tick();
-  
-  if( shouldReport ){
-    shouldReport = false;
-    Serial.println("Reporting deviation - " + String(dropMin) + " : " + String(dropMax) + " : " + String(deviation));
-    connection.sendMessage("SET:deviation=" + String(deviation));
-  }
-  
-  //vTaskDelay(portMAX_DELAY);
+  vTaskDelay(portMAX_DELAY);
 }

@@ -1,83 +1,156 @@
 #include <Adafruit_NeoPixel.h>
 #define LED_PIN 12
 
-int blinkCount; 
-TriggerPair alive, pixel;
+static const char* PIXEL_LOG_TAG = "Pixel"; 
+
+Ticker pixelTask;
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, LED_PIN, NEO_GRB + NEO_KHZ800);
 
-void pixelSetup(){
+enum PixelState {
+  booting = 0,
+  connecting,
+  updating,
+  executing,
+  indicating,
+  alerting
+};
+
+PixelState pixelState = booting;
+int indicationCount = 0;
+
+/*
+void assignPixelState(newState) {
+  if( pixelState != newState ){
+    pixelTask.detach();
+    pixelState = newState;
+    pixelOn();    
+  }
+}
+*/
+
+void setConnecting(){
+  pixelState = connecting;  
+}
+
+void setUpdating(){
+  pixelState = updating;  
+}
+
+void setExecuting(){
+  pixelState = executing;  
+}
+
+void setIndicating(){
+  indicationCount = 25;
+  pixelState = indicating;  
+  pixelTask.detach();
+  pixelOn();
+}
+
+void setAlerting(){
+  pixelState = alerting;  
+  pixelTask.detach();
+  pixelOn();
+}
+
+int getOnTime(){
+  switch (pixelState) {
+    case booting:
+      return 50;
+    case connecting:
+      return 1000;
+    case updating:
+      return 1000;
+    case executing:
+      return 5;
+    case indicating:
+      return 50;
+    case alerting:
+      return 1000;
+    default:
+      return 1000;
+  }
+
+  return 1000;
+}
+
+int getOffTime(){
+  switch (pixelState) {
+    case booting:
+      return 1000;
+    case connecting:
+      return 1000;
+    case updating:
+      return 1000;
+    case executing:
+      return 1000;
+    case indicating:
+      return 100;
+    case alerting:
+      return 1000;
+    default:
+      return 1000;
+  }
+}
+
+uint32_t getColor(){
+  strip.setBrightness(100);
+  
+  switch (pixelState) {
+    case booting:
+      return strip.Color(255,0,0);
+    case connecting:
+      return strip.Color(0,255,0);
+    case updating:
+    strip.setBrightness(100);
+      return strip.Color(0,0,255);
+    case executing:
+      return strip.Color(255,255,0);
+    case indicating:
+      strip.setBrightness(200);
+      return strip.Color(255,0,255);
+    case alerting:
+      strip.setBrightness(100);
+      return strip.Color(0,255,255);
+    default:
+      return strip.Color(255,255,255);
+  }
+
+  return strip.Color(255,255,255);
+}
+
+
+void startPixel() {
   strip.begin();
   strip.setBrightness(50);
   strip.setPixelColor(0,strip.Color(50,10,10));
   strip.show();
-  strip.show();
-
-  alive     = TriggerPair( aliveOn, 5000, aliveOff, 5);
-  pixel     = TriggerPair( pixelOn, 100, pixelOff, 50);
-  alive.execute();
+  
+  pixelOn();
 }
 
 /* ----- Onboard Neopixel ------------------------------------------ */
 
 void pixelOn(){
-  Serial.println("PixelOn");
-  strip.setBrightness(100);
-  strip.setPixelColor(0, strip.Color(20,200,20));
+  ESP_LOGI(PIXEL_LOG_TAG,"Pixel On");
+  strip.setPixelColor(0, getColor());
   strip.show();
-  strip.show();
-  pixel.rescheduleBeta();
+  pixelTask.once_ms(getOnTime(), pixelOff);
 }
 
 void pixelOff(){
-  Serial.println("PixelOff");
-  aliveOff();
-}
+  ESP_LOGI(PIXEL_LOG_TAG,"Pixel Off");
+  strip.setPixelColor(0, strip.Color(0,0,0));
+  strip.show();
 
-/* ----- Onboard Neopixel  ---------------------------------------------- */
+  pixelTask.once_ms(getOffTime(), pixelOn);
 
-void aliveOn(){
-  if( pixel.isActive() ){
-      return;
+  if( pixelState == alerting ) {
+    setExecuting();    
   }
-  
-  if(blinkCount > 0){
-    blinkCount--;
-    strip.setBrightness(150);
-    strip.setPixelColor(0, strip.Color(150,50,50));
+  if( indicationCount > 0 ){
+    if(--indicationCount == 0){
+      setExecuting();  
+    }
   }
-  else {
-    strip.setBrightness(10);
-    strip.setPixelColor(0, strip.Color(23,152,193));
-    alive.alphaOffset(5000);
-    alive.betaOffset(5);   
-  }
-  
-  strip.show();
-  strip.show();
-  alive.rescheduleBeta();
-}
-
-void aliveOff(){
-  strip.setPixelColor(0, 0, 0, 0, 0);
-  strip.show();
-  strip.show();
-  alive.rescheduleAlpha();
-}
-
-void doAlive(){
-  blinkCount = 20;
-  pixel.invalidate();
-  alive.invalidate();
-  alive.alphaOffset(100);
-  alive.betaOffset(100);
-  alive.execute();
-}
-
-void doPixel(){
-  pixel.execute();
-}
-
-void pixelLoop(){
-  alive.tick();
-  pixel.tick();
 }

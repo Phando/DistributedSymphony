@@ -9,6 +9,8 @@
 #include <SPI.h>
 #include <Wire.h>
 
+
+
 // Display SPI Pins
 #define OLED_MOSI  13
 #define OLED_CLK   14
@@ -70,16 +72,18 @@ void updateDisplay(){
   display.setTextSize(1);
   display.println("SSID Publisher\n\n" + ssid +"\n");
   display.println(BLEDevice::getAddress().toString().c_str());
-  display.println("");
-  display.setTextSize(2);
+
+  for(int i=0; i<CHAR_MAX; i++){
+    display.drawCircle((i*14)+5, 58, 3, WHITE);  
+  }
   for(int i=0; i<charCount; i++){
-    display.print(".");  
+    display.fillCircle((i*14)+5, 58, 3, WHITE);  
   }
   display.display();
 }
 
 void loop() {
-  if(++charCount == CHAR_MAX){
+  if(charCount++ == CHAR_MAX-1){
     charCount = 0;  
   }
   updateDisplay();

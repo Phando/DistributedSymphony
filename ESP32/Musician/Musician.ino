@@ -10,6 +10,9 @@
 #define ENABLED 0 
 #define DISABLED 1
 
+const long  gmtOffset_sec = 3600;
+const int   daylightOffset_sec = 3600;
+
 static const char* OHANA_PATTERN = ":0:2:3:4:6:10:12";
 static const char* SURVEY_URL = "tinyurl.com/SFIS2018";
 static const char* LOG_TAG = "Musician";
@@ -76,8 +79,11 @@ void handleMessage(String message) {
   message.toCharArray(tokens, len);
   tokens = strtok(tokens, ":");
   
-  if( String(tokens) == "CALIBRATE"){
+  if( String(tokens) == "TEST"){
     beginDropTest();
+  }
+  if( String(tokens) == "SYNC"){
+    beginPlay(tokens);
   }
   if( String(tokens) == "PLAY"){
     if(message.indexOf(OHANA_PATTERN)!=-1){
@@ -85,15 +91,6 @@ void handleMessage(String message) {
     }
     beginPlay(tokens);
   }
-  if( String(tokens) == "DISABLE"){
-    // TODO disable the user button
-    // TODO disable "PLAY:CALIBRATE"
-  }
-  if( String(tokens) == "ENABLE"){
-    // TODO enable the user button
-    // TODO enable "PLAY:CALIBRATE"
-  }
-  
   if( String(tokens) == "ALIVE"){
     //doAlive();
   }
@@ -125,8 +122,7 @@ void setup() {
   SymphonyConnection.start();
   SymphonyConnection.onMessage(handleMessage);
   SymphonyConnection.onChange("state", handleStateChange);
-
-  ESP_LOGI(LOG_TAG,"State from storage: %s", SymphonyConnection.getParameter("state"));
+  //ESP_LOGI(LOG_TAG,"State from storage: %s", SymphonyConnection.getParameter("state").c_str());
 }
 
 /* ----- Prepare for Test  ---------------------------------------------- */
@@ -135,7 +131,7 @@ void beginDropTest(){
   dropTest = true;
   dropMin = 50000;
   dropMax = 0;
-  handleMessage("PLAY:1500:0:" + String(gateTime) + ":0:1:2:3:4");
+  handleMessage("PLAY:1500:0:0:1:2:3:4");
 }
 
 /* ----- Prepare for Play  ---------------------------------------------- */
@@ -166,11 +162,11 @@ void beginPlay(char* tokens){
   }
 
   // Gate Time
-  tokens = strtok(NULL, ":");
-  if(tokens != NULL){
-    ESP_LOGI(LOG_TAG,"Gate Time: %s", tokens);
-    gateTime = atoi(tokens);
-  }
+  //tokens = strtok(NULL, ":");
+  //if(tokens != NULL){
+  //  ESP_LOGI(LOG_TAG,"Gate Time: %s", tokens);
+  //  gateTime = atoi(tokens);
+  //}
 
   // Notes
   tokens = strtok(NULL, ":"); 
@@ -188,10 +184,23 @@ void beginPlay(char* tokens){
       gateOpen();
     }
     else {
+      timeval tv = {0,0};
+      gettimeofday(&tv, NULL);
+      tv.tv_sec -= 1525910400; // Making the time a 32bit number
+      unsigned long now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+      Serial.println("Start: " + String(startTime));
+      Serial.println("Schedule: " + String(scheduleTime));
+      scheduleTime -= now + deviation;
+      startTime += scheduleTime;
+      Serial.println("Start Adj: " + String(startTime));
+      Serial.println("Schedule Adj1: " + String(scheduleTime));
       scheduleTime += nextNote * tempo;
-      scheduleTime -= startTime + deviation;
+      Serial.println("Schedule Adj2: " + String(scheduleTime));
       gateOpenTask.once_ms(scheduleTime, gateOpen);
     }
+
+
+
   }
 }
 
@@ -264,7 +273,7 @@ void gateOpen(){
   
   if( !notes.isEmpty() && !dropTest ){
     int nextNote = notes.pop();
-    gateOpenTask.once_ms((startTime-dropTime)+(nextNote*tempo), gateOpen);
+    gateOpenTask.once_ms((startTime-dropTime)+nextNote*tempo, gateOpen);
   }
 }
 

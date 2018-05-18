@@ -27,7 +27,6 @@ All text above, and the splash screen must be included in any redistribution
 #define OLED_DC    5
 #define OLED_CS    4
 #define OLED_RESET 21
-static const char* SURVEY_URL = "tinyurl.com/SFIS2018";
 
 Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
@@ -45,35 +44,13 @@ void displayInit(){
 void updateDisplay(){
   display.clearDisplay();
   display.setTextSize(1);
+  display.setCursor(0,0);
+  display.print("Initial");
   if(SymphonyConnection.isConnected()){
     display.fillCircle(display.width()/2, 3, 3, WHITE);
   }
   else {
     display.drawCircle(display.width()/2, 3, 3, WHITE);
   }
-  
-  display.setCursor(0,0);
-  display.print("Note:" + teamKey);
-  display.setCursor(80,0);
-  display.print("Gate:" + String(gateTime));
-
-  if( displayState == "ohana" ){
-    display.setTextSize(3);
-    display.setCursor(20,20);
-    display.print("Ohana");
-    display.setTextSize(1);
-  } else if(displayState == "url") {
-    display.setCursor(4,30);
-    display.print(SURVEY_URL);
-  }
-  
-  display.setCursor(0,57);
-  display.print("Team:" + teamId);
-  
-  if(deviation != -1){
-    display.setCursor(74,57);
-    display.print("Score:" + String(_min(deviation,500)));
-  }
-  
   display.display();
 }

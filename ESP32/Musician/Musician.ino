@@ -5,46 +5,22 @@
 
 #define BUT_PIN 22
 #define NOTE_PIN1 26
-//#define NOTE_PIN2 27
 #define MIC_PIN 23
-#define ENABLED 0 
-#define DISABLED 1
 
-const long  gmtOffset_sec = 3600;
-const int   daylightOffset_sec = 3600;
-
-static const char* OHANA_PATTERN = ":0:2:3:4:6:10:12";
-static const char* SURVEY_URL = "tinyurl.com/SFIS2018";
-static const char* LOG_TAG = "Musician";
-unsigned long MUSICIAN_WORK_PERIOD = 5000;
-unsigned long workPeriod = 5000;
+const char* OHANA_PATTERN = ":0:2:3:4:6:10:12";
+const char* LOG_TAG = "Musician";
 
 QueueArray <int> notes;
-Ticker gateCloseTask, gateOpenTask, reportTask;
+Ticker reportTask;
 
-bool dropTest = false;
-bool hasOhana = false;
-bool shouldConnect = false;
-
-// Interrupts and debouncing
-unsigned long tempo = 300;
-unsigned long bounceDelay = 150;
-unsigned long lastButtonTime = 0;  // the last time the output pin was toggled
-unsigned long lastImpactTime = 0;
-unsigned long lastTouch1Time = 0;
-unsigned long lastTouch2Time = 0;  
-
-int dropMin, dropMax;
-unsigned long dropTime = 0; 
-unsigned long deviation = -1; 
-
-unsigned long scheduleTime = 0;
-unsigned long startTime = 0;
+unsigned long tempo = 300;  
+unsigned long deviation = 0;
 unsigned long gateTime = 100;
 
-String teamId = "0000";
-String teamKey = "Z2";
-String state = "Build";
+String displayState = "empty";
+String teamId = "";
+String teamKey = "";
+String state = "";
 
 /**
  * This callback will be in invoked for state changes from the server.
@@ -56,7 +32,7 @@ void handleStateChange(String message) {
   if( message == "Intro"){
   }
   if( message == "Build"){
-   
+    displayState == "url";
   }
   if( message == "Manual"){
   }
@@ -66,7 +42,6 @@ void handleStateChange(String message) {
   }
   state = message;
 }
-
 
 /**
  * This callback will be in invoked for messages from the server.
@@ -86,14 +61,24 @@ void handleMessage(String message) {
     beginPlay(tokens);
   }
   if( String(tokens) == "PLAY"){
-    if(message.indexOf(OHANA_PATTERN)!=-1){
-      hasOhana = true;  
+    if(displayState != "ohana"){
+      displayState = "empty";  
     }
+    if(message.indexOf(OHANA_PATTERN)!=-1){
+      displayState = "ohana"; 
+    } 
     beginPlay(tokens);
   }
   if( String(tokens) == "ALIVE"){
-    //doAlive();
+    setIndicating();
   }
+}
+
+/**
+ * This callback will be in invoked when the server connection changes
+ */
+void handleConnectionChange(String message) {
+  ESP_LOGI(LOG_TAG,"ConnectionChange: %s", message.c_str());
 }
 
 /* ----- SETUP  ---------------------------------------------- */
@@ -109,186 +94,25 @@ void setup() {
   notes.setPrinter (Serial);
   
   displayInit();
-  updateDisplay();
+  startPixel();
   
   // Setting up interrupts
   attachInterrupt(digitalPinToInterrupt(BUT_PIN), handleButton, RISING);
   attachInterrupt(digitalPinToInterrupt(MIC_PIN), handleImpact, RISING);
-  touchAttachInterrupt(T2, gotTouch1, (10+touchRead(T2))/2);
-  touchAttachInterrupt(T3, gotTouch2, (10+touchRead(T3))/2);
+  touchAttachInterrupt(T2, handleTouch1, (10+touchRead(T2))/2);
+  touchAttachInterrupt(T3, handleTouch2, (10+touchRead(T3))/2);
 
   ESP_LOGI(LOG_TAG,"Connecting to Symphony");
  
   SymphonyConnection.start();
   SymphonyConnection.onMessage(handleMessage);
   SymphonyConnection.onChange("state", handleStateChange);
-  //ESP_LOGI(LOG_TAG,"State from storage: %s", SymphonyConnection.getParameter("state").c_str());
-}
-
-/* ----- Prepare for Test  ---------------------------------------------- */
-
-void beginDropTest(){
-  dropTest = true;
-  dropMin = 50000;
-  dropMax = 0;
-  handleMessage("PLAY:1500:0:0:1:2:3:4");
-}
-
-/* ----- Prepare for Play  ---------------------------------------------- */
-
-void beginPlay(char* tokens){
-  gateCloseTask.detach();
-  gateOpenTask.detach();
-  startTime = 0;
-  scheduleTime = 0;
-
-  while( !notes.isEmpty() ){
-    notes.pop();
-  } 
+  //SymphonyConnection.onConnectionStateChange(handleConnectionChange);
   
-  // TEMPO
-  tokens = strtok(NULL, ":");
-  if(tokens != NULL){
-    ESP_LOGI(LOG_TAG,"Tempo: %s", tokens);
-    tempo = atoi(tokens);
-    bounceDelay = tempo / 1.25;
-  }
-
-  // SCHEDULE
-  tokens = strtok(NULL, ":");
-  if(tokens != NULL){
-    ESP_LOGI(LOG_TAG,"Start Time: %s", tokens);
-    scheduleTime = atoi(tokens);
-  }
-
-  // Gate Time
-  //tokens = strtok(NULL, ":");
-  //if(tokens != NULL){
-  //  ESP_LOGI(LOG_TAG,"Gate Time: %s", tokens);
-  //  gateTime = atoi(tokens);
-  //}
-
-  // Notes
-  tokens = strtok(NULL, ":"); 
-  while( tokens != NULL ) {
-    notes.push(atoi(tokens));
-    tokens = strtok(NULL, ":"); 
-  }
-  
-  // If there are notes play them
-  if( notes.count() > 0 ) {
-    int nextNote = notes.pop(); // Get the first note and start
-    startTime = millis();
-    
-    if( scheduleTime == 0 ) {
-      gateOpen();
-    }
-    else {
-      timeval tv = {0,0};
-      gettimeofday(&tv, NULL);
-      tv.tv_sec -= 1525910400; // Making the time a 32bit number
-      unsigned long now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-      Serial.println("Start: " + String(startTime));
-      Serial.println("Schedule: " + String(scheduleTime));
-      scheduleTime -= now + deviation;
-      startTime += scheduleTime;
-      Serial.println("Start Adj: " + String(startTime));
-      Serial.println("Schedule Adj1: " + String(scheduleTime));
-      scheduleTime += nextNote * tempo;
-      Serial.println("Schedule Adj2: " + String(scheduleTime));
-      gateOpenTask.once_ms(scheduleTime, gateOpen);
-    }
-
-
-
-  }
-}
-
-/* ------------------------------------------------------------------- */
-/* ----- Interrupt Handlers ------------------------------------------ */
-/* ------------------------------------------------------------------- */
-
-/* ------------------------------------------------------------------- */
-void gotTouch1(){
-  if (lastTouch1Time > millis()) return;
-  lastTouch1Time = 250 + millis();
-  
-  gateTime = _max(40, gateTime - 10);
+  getTeamId();  
+  getTeamKey();  
+  getState();
   updateDisplay();
-  ESP_LOGI(LOG_TAG,"TOUCH1 : %d", gateTime);
-}
-
-/* ------------------------------------------------------------------- */
-void gotTouch2(){
-  if (lastTouch2Time > millis()) return;
-  lastTouch2Time = 250 + millis();
-  
-  gateTime = _min(200, gateTime + 10);
-  updateDisplay();
-  ESP_LOGI(LOG_TAG,"TOUCH2 : %d", gateTime);
-}
-
-/* ------------------------------------------------------------------- */
-void handleButton() {
-  if (lastButtonTime > millis()) return;
-  lastButtonTime = bounceDelay + millis();
-  gateOpen();
-}
-
-/* ------------------------------------------------------------------- */
-void handleImpact() {
-  if(lastImpactTime > millis()) return; 
-  
-  lastImpactTime = bounceDelay + millis();
-  ESP_LOGI(LOG_TAG,"Impact at: %d", millis() - dropTime);
-  
-  //doPixel();
-  
-  if( dropTest ) {
-    dropTime = millis() - dropTime;
-    dropMin = _min(dropMin, dropTime);
-    dropMax = _max(dropMax, dropTime);  
-    
-    if( notes.isEmpty() ){
-      dropTest = false;
-      deviation = (dropMax - dropMin) / 2;
-      reportTask.once_ms(100, sendDeviation);
-    }
-    else {
-      int nextNote = notes.pop();
-      gateOpenTask.once_ms(tempo, gateOpen);
-    }
-  }
-}
-
-/* ----- Gate Open  ---------------------------------------------- */
-
-void gateOpen(){
-  dropTime = millis();
-  digitalWrite(NOTE_PIN1, HIGH);
-  gateCloseTask.once_ms(gateTime, gateClose);
-  
-  ESP_LOGI(LOG_TAG,"GateOpen Time: %d", dropTime);
-  lastImpactTime = dropTime + 10; // This fixes instant interrupts
-  
-  if( !notes.isEmpty() && !dropTest ){
-    int nextNote = notes.pop();
-    gateOpenTask.once_ms((startTime-dropTime)+nextNote*tempo, gateOpen);
-  }
-}
-
-/* ----- Gate Close  ---------------------------------------------- */
-
-void gateClose(){
-  ESP_LOGI(LOG_TAG,"GateClose Time: %d", millis());
-  digitalWrite(NOTE_PIN1, LOW);
-}
-
-/* ----- Send Report  ---------------------------------------------- */
-
-void sendDeviation(){
-  ESP_LOGI(LOG_TAG,"Reporting deviation - %d : %d : %d", dropMin, dropMax, deviation);
-  SymphonyConnection.sendMessage("SET:deviation=" + String(deviation));
 }
 
 /* ----- Get TeamId  ---------------------------------------------- */
@@ -314,11 +138,4 @@ void getState(){
 
 void loop() {
   SymphonyConnection.workConnection();
-  if( workPeriod < millis() ){
-    workPeriod = MUSICIAN_WORK_PERIOD + millis();
-    if( teamId == "0000"){ getTeamId();  }
-    if( teamKey == "Z"){ getTeamKey();  }
-    if( state == "Empty"){ getState();  }
-    updateDisplay();
-  }
 }

@@ -18,16 +18,6 @@ enum PixelState {
 PixelState pixelState = booting;
 int indicationCount = 0;
 
-/*
-void assignPixelState(newState) {
-  if( pixelState != newState ){
-    pixelTask.detach();
-    pixelState = newState;
-    pixelOn();    
-  }
-}
-*/
-
 void setConnecting(){
   pixelState = connecting;  
 }
@@ -37,7 +27,9 @@ void setUpdating(){
 }
 
 void setExecuting(){
-  pixelState = executing;  
+  pixelState = executing;
+  pixelTask.detach();
+  pixelOn();  
 }
 
 void setIndicating(){
@@ -56,22 +48,20 @@ void setAlerting(){
 int getOnTime(){
   switch (pixelState) {
     case booting:
-      return 50;
+      return 10;
     case connecting:
-      return 1000;
+      return 10;
     case updating:
-      return 1000;
+      return 10;
     case executing:
       return 5;
     case indicating:
       return 50;
     case alerting:
-      return 1000;
+      return 100;
     default:
       return 1000;
   }
-
-  return 1000;
 }
 
 int getOffTime(){
@@ -83,7 +73,7 @@ int getOffTime(){
     case updating:
       return 1000;
     case executing:
-      return 1000;
+      return 5000;
     case indicating:
       return 100;
     case alerting:
@@ -94,7 +84,7 @@ int getOffTime(){
 }
 
 uint32_t getColor(){
-  strip.setBrightness(100);
+  strip.setBrightness(25);
   
   switch (pixelState) {
     case booting:
@@ -102,7 +92,6 @@ uint32_t getColor(){
     case connecting:
       return strip.Color(0,255,0);
     case updating:
-    strip.setBrightness(100);
       return strip.Color(0,0,255);
     case executing:
       return strip.Color(255,255,0);
@@ -125,7 +114,6 @@ void startPixel() {
   strip.setBrightness(50);
   strip.setPixelColor(0,strip.Color(50,10,10));
   strip.show();
-  
   pixelOn();
 }
 
@@ -135,6 +123,7 @@ void pixelOn(){
   ESP_LOGI(PIXEL_LOG_TAG,"Pixel On");
   strip.setPixelColor(0, getColor());
   strip.show();
+  strip.show();
   pixelTask.once_ms(getOnTime(), pixelOff);
 }
 
@@ -142,7 +131,7 @@ void pixelOff(){
   ESP_LOGI(PIXEL_LOG_TAG,"Pixel Off");
   strip.setPixelColor(0, strip.Color(0,0,0));
   strip.show();
-
+  strip.show();
   pixelTask.once_ms(getOffTime(), pixelOn);
 
   if( pixelState == alerting ) {

@@ -1,16 +1,24 @@
-#include "OTAManager.h"
+#include <esp_log.h>
+#include <SymphonyConnection.h>
+
+const char* LOG_TAG = "MAIN_SKETCH";
+
+void handleConnectionChange(bool state) {
+  updateDisplay();  
+}
 
 void setup() {
-  Serial.begin(115200);
-  delay(100);
-  Serial.println("");
-  Serial.println("Executing initial software:");
-  Serial.println("Acuiring WiFi credentials and latest sketch.");
-  OTAManager::getInstance().clearPreferences();
-  OTAManager::getInstance().start();
+  ESP_LOGI(LOG_TAG,"Initial Sketch");
+  displayInit();
+  startPixel();
+  
+  ESP_LOGI(LOG_TAG,"Connecting to Symphony");
+  SymphonyConnection.start();
+  SymphonyConnection.clearPreferences();
+  SymphonyConnection.onConnectionChange(handleConnectionChange);
+  updateDisplay(); 
 }
 
 void loop() {
-  Serial.println("Initial software loop.");
-  vTaskDelay(portMAX_DELAY);
+  SymphonyConnection.workConnection();
 }

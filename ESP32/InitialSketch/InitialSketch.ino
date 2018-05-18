@@ -11,6 +11,7 @@ void setup() {
   ESP_LOGI(LOG_TAG,"Initial Sketch");
   displayInit();
   startPixel();
+  pixelOn();
   
   ESP_LOGI(LOG_TAG,"Connecting to Symphony");
   SymphonyConnection.start();

@@ -11,7 +11,29 @@ void startPixel() {
   strip.setBrightness(25);
   strip.setPixelColor(0,strip.Color(255,0,0));
   strip.show();
-  pixelOn();
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 /* ----- Onboard Neopixel ------------------------------------------ */

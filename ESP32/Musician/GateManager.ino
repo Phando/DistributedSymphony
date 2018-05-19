@@ -75,15 +75,9 @@ void beginPlay(char* tokens){
       gettimeofday(&tv, NULL);
       tv.tv_sec -= EPOCH_VALUE;
       unsigned long now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-      Serial.println("Start: " + String(startTime));
-      Serial.println("Schedule: " + String(scheduleTime));
-      //scheduleTime -= now + deviation;
       scheduleTime -= now + average;
       startTime += scheduleTime;
-      Serial.println("Start Adj: " + String(startTime));
-      Serial.println("Schedule Adj1: " + String(scheduleTime));
       scheduleTime += nextNote * tempo;
-      Serial.println("Schedule Adj2: " + String(scheduleTime));
       gateOpenTask.once_ms(scheduleTime, gateOpen);
     }
   }
@@ -95,18 +89,16 @@ void handleTouch1(){
   lastTouch1Time = 250 + millis();
   
   gateTime = _max(40, gateTime - 10);
-  updateDisplay();
-  ESP_LOGI(LOG_TAG,"TOUCH1 : %d", gateTime);
+  reportTask.once_ms(10, persistGate);
 }
 
 /* ------------------------------------------------------------------- */
 void handleTouch2(){
   if (lastTouch2Time > millis() || shouldIgnore()) return;
   lastTouch2Time = 250 + millis();
-  
+
   gateTime = _min(200, gateTime + 10);
-  updateDisplay();
-  ESP_LOGI(LOG_TAG,"TOUCH2 : %d", gateTime);
+  reportTask.once_ms(10, persistGate);
 }
 
 /* ------------------------------------------------------------------- */
@@ -169,11 +161,19 @@ void gateClose(){
 
 /* ----- Send Report  ---------------------------------------------- */
 
+void persistGate(){
+  ESP_LOGI(LOG_TAG,"Gate : %d", gateTime);
+  SymphonyConnection.setParameter("gate", String(gateTime));
+  updateDisplay();
+}
+
+/* ----- Send Report  ---------------------------------------------- */
+
 void sendReport(){
   ESP_LOGI(LOG_TAG,"Reporting - min:%d  max:%d  dev:%d dt:%d", dropMin, dropMax, deviation, average );
   updateDisplay();
   SymphonyConnection.sendMessage("SET:dropTime=" + String(average));
-  delay(100);
+  delay(500);
   SymphonyConnection.sendMessage("SET:deviation=" + String(deviation));
 }
 

@@ -30,10 +30,11 @@ void handleStateChange(String message) {
   ESP_LOGI(LOG_TAG,"Server State: %s", message.c_str());
   
   if( message == "STOP"){
-    displayState == "NONE";
+    displayState = "NONE";
     hasRemote = false;
   }
   if( message == "INTRO"){
+    displayState = "NONE";
   }
   if( message == "BUILD"){
     displayState = "URL";
@@ -127,7 +128,8 @@ void setup() {
   SymphonyConnection.onChange("key", handleChange);
   SymphonyConnection.onChange("team", handleChange);
   SymphonyConnection.onConnectionChange(handleConnectionChange);
-  
+
+  getGateTime();
   getTeamId();  
   getTeamKey();  
   getState();
@@ -144,6 +146,18 @@ void getTeamId(){
 
 void getTeamKey(){
   teamKey = SymphonyConnection.getParameter("key");
+}
+
+/* ----- Get Gate Time ---------------------------------------------- */
+
+void getGateTime(){
+  int gTime = SymphonyConnection.getParameter("gate").toInt();
+  ESP_LOGI(LOG_TAG,"Gate Time: %d", gTime);
+  if(gTime <= 0){
+    gTime = 100;
+  }
+  ESP_LOGI(LOG_TAG,"Gate Time: %d", gTime);
+  gateTime = gTime;
 }
 
 /* ----- Get Server State ---------------------------------------------- */

@@ -17,30 +17,36 @@ unsigned long tempo = 300;
 unsigned long deviation = 0;
 unsigned long gateTime = 100;
 
+bool hasRemote = false;
 String displayState = "empty";
 String teamId = "";
 String teamKey = "";
 String state = "";
-
+ 
 /**
  * This callback will be in invoked for state changes from the server.
  */
 void handleStateChange(String message) {
   ESP_LOGI(LOG_TAG,"Server State: %s", message.c_str());
-  if( message == "Stop"){
+  
+  if( message == "STOP"){
+    displayState == "NONE";
+    hasRemote = false;
   }
-  if( message == "Intro"){
+  if( message == "INTRO"){
   }
-  if( message == "Build"){
-    displayState == "url";
+  if( message == "BUILD"){
+    displayState = "URL";
   }
-  if( message == "Manual"){
+  if( message == "MANUAL"){
   }
-  if( message == "Finale"){
+  if( message == "FINALE"){
   }
-  if( message == "Winner"){
+  if( message == "WINNER"){
   }
+
   state = message;
+  updateDisplay();
 }
 
 /**
@@ -54,13 +60,13 @@ void handleMessage(String message) {
   message.toCharArray(tokens, len);
   tokens = strtok(tokens, ":");
   
-  if( String(tokens) == "TEST"){
+  if( String(tokens) == "TEST" && shouldRespond()){
     beginDropTest();
   }
   if( String(tokens) == "SYNC"){
     beginPlay(tokens);
   }
-  if( String(tokens) == "PLAY"){
+  if( String(tokens) == "PLAY" && shouldRespond()){
     if(displayState != "ohana"){
       displayState = "empty";  
     }
@@ -72,13 +78,25 @@ void handleMessage(String message) {
   if( String(tokens) == "ALIVE"){
     setIndicating();
   }
+ 
+  hasRemote = true;
+  updateDisplay();
 }
 
 /**
  * This callback will be in invoked when the server connection changes
  */
-void handleConnectionChange(String message) {
-  ESP_LOGI(LOG_TAG,"ConnectionChange: %s", message.c_str());
+void handleChange(String message) {
+  ESP_LOGI(LOG_TAG,"Change: %d", message);
+  updateDisplay();
+}
+
+/**
+ * This callback will be in invoked when the server connection changes
+ */
+void handleConnectionChange(bool message) {
+  ESP_LOGI(LOG_TAG,"ConnectionChange: %d", message);
+  updateDisplay();
 }
 
 /* ----- SETUP  ---------------------------------------------- */
@@ -103,11 +121,12 @@ void setup() {
   touchAttachInterrupt(T3, handleTouch2, (10+touchRead(T3))/2);
 
   ESP_LOGI(LOG_TAG,"Connecting to Symphony");
- 
   SymphonyConnection.start();
   SymphonyConnection.onMessage(handleMessage);
   SymphonyConnection.onChange("state", handleStateChange);
-  //SymphonyConnection.onConnectionStateChange(handleConnectionChange);
+  SymphonyConnection.onChange("key", handleChange);
+  SymphonyConnection.onChange("team", handleChange);
+  SymphonyConnection.onConnectionChange(handleConnectionChange);
   
   getTeamId();  
   getTeamKey();  
@@ -132,6 +151,16 @@ void getTeamKey(){
 void getState(){
   state = SymphonyConnection.getParameter("state");
   handleStateChange(state);
+}
+
+/* ----- Utility functions to enforce state  ------------------------------------ */
+
+bool shouldIgnore() {
+  return state == "STOP" || state == "FINALE" || state == "WINNER";
+}
+
+bool shouldRespond() {
+  return !shouldIgnore();
 }
 
 /* ----- Main Loop  ---------------------------------------------- */

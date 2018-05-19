@@ -120,7 +120,7 @@ void startPixel() {
 /* ----- Onboard Neopixel ------------------------------------------ */
 
 void pixelOn(){
-  ESP_LOGI(PIXEL_LOG_TAG,"Pixel On");
+  ESP_LOGD(PIXEL_LOG_TAG,"Pixel On");
   strip.setPixelColor(0, getColor());
   strip.show();
   strip.show();
@@ -128,7 +128,7 @@ void pixelOn(){
 }
 
 void pixelOff(){
-  ESP_LOGI(PIXEL_LOG_TAG,"Pixel Off");
+  ESP_LOGD(PIXEL_LOG_TAG,"Pixel Off");
   strip.setPixelColor(0, strip.Color(0,0,0));
   strip.show();
   strip.show();

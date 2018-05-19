@@ -46,10 +46,10 @@ void updateDisplay(){
   display.clearDisplay();
   display.setTextSize(1);
   if(SymphonyConnection.isConnected()){
-    display.fillCircle(display.width()/2, 3, 3, WHITE);
+    display.fillCircle(display.width()/2.2, 3, 3, WHITE);
   }
   else {
-    display.drawCircle(display.width()/2, 3, 3, WHITE);
+    display.drawCircle(display.width()/2.2, 3, 3, WHITE);
   }
   
   display.setCursor(0,0);
@@ -62,15 +62,17 @@ void updateDisplay(){
     display.setCursor(20,20);
     display.print("Ohana");
     display.setTextSize(1);
-  } else if(displayState == "url") {
+  } else if(displayState == "URL" && !hasRemote) {
     display.setCursor(4,30);
     display.print(SURVEY_URL);
   }
+
+  if(displayState == "URL" || hasRemote) {
+    display.setCursor(0,57);
+    display.print("Team:" + teamId);
+  }
   
-  display.setCursor(0,57);
-  display.print("Team:" + teamId);
-  
-  if(deviation != -1){
+  if(deviation > 0){
     display.setCursor(74,57);
     display.print("Score:" + String(_min(deviation,500)));
   }

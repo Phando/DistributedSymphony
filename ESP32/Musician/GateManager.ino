@@ -3,18 +3,11 @@ Ticker gateCloseTask, gateOpenTask;
 
 #define EPOCH_VALUE 1525910400 // Br the time a 32bit number
 
-//const long GMT_OFFSET_SEC = 3600;
-//const int DAYLIGHT_OFFSET_SEC = 3600;
-
 bool dropTest = false;
 
-int dropMin, dropMax;
-int dropIndex = 0;
-int dropTimes[] = {0, 0, 0, 0, 0};
+unsigned long dropMin, dropMax;
 unsigned long dropTime = 0; 
- 
 unsigned long average = -1;
-unsigned long lastAverage = -1; 
 unsigned long scheduleTime = 0;
 unsigned long startTime = 0;
 
@@ -29,6 +22,9 @@ unsigned long lastTouch2Time = 0;
 
 void beginDropTest(){
   dropTest = true;
+  average = 0;
+  dropMax = 0;
+  dropMin = 50000;
   handleMessage("PLAY:1500:0:0:1:2:3:4");
 }
 
@@ -95,7 +91,7 @@ void beginPlay(char* tokens){
 
 /* ------------------------------------------------------------------- */
 void handleTouch1(){
-  if (lastTouch1Time > millis()) return;
+  if (lastTouch1Time > millis() || shouldIgnore()) return;
   lastTouch1Time = 250 + millis();
   
   gateTime = _max(40, gateTime - 10);
@@ -105,7 +101,7 @@ void handleTouch1(){
 
 /* ------------------------------------------------------------------- */
 void handleTouch2(){
-  if (lastTouch2Time > millis()) return;
+  if (lastTouch2Time > millis() || shouldIgnore()) return;
   lastTouch2Time = 250 + millis();
   
   gateTime = _min(200, gateTime + 10);
@@ -115,7 +111,7 @@ void handleTouch2(){
 
 /* ------------------------------------------------------------------- */
 void handleButton() {
-  if (lastButtonTime > millis()) return;
+  if (lastButtonTime > millis() || shouldIgnore()) return;
   lastButtonTime = bounceDelay + millis();
   gateOpen();
 }
@@ -124,48 +120,35 @@ void handleButton() {
 void handleImpact() {
   if(lastImpactTime > millis()) return; 
   
-  int dropTime = millis() - dropTimes[dropIndex];
-  lastImpactTime = bounceDelay + millis();
-  
+  dropTime = millis() - dropTime;
+  lastImpactTime = millis() + bounceDelay;
   ESP_LOGI(LOG_TAG,"Impact at: %d", dropTime);
   setAlerting();
 
-  // TODO: Test running average
-  
   if( dropTest ) {
-    dropTimes[dropIndex] = dropTime;
-    
+    dropMin = _min(dropMin, dropTime);
+    dropMax = _max(dropMax, dropTime);
+    average += dropTime;
+        
     if( notes.isEmpty() ){
       dropTest = false;
-      average = 0;
-      dropMax = 0;
-      dropMin = 50000;
-      for(int i = 0; i < 5; i++){
-        dropMin = _min(dropMin, dropTime);
-        dropMax = _max(dropMax, dropTime);
-        average += dropTimes[dropIndex];
-      } 
       average /= 5; 
       deviation = (dropMax - dropMin) / 2;
-      reportTask.once_ms(100, sendDeviation);
+      ESP_LOGI(LOG_TAG,"Deviation: %d", deviation);
+      reportTask.once_ms(100, sendReport);
     }
     else {
-      int nextNote = notes.pop();
+      notes.pop();
       gateOpenTask.once_ms(tempo, gateOpen);
     }
-  }
-
-  if(dropIndex++ == 5){
-    dropIndex = 0;
   }
 }
 
 /* ----- Gate Open  ---------------------------------------------- */
 
 void gateOpen(){
-  int dropTime = millis();
+  dropTime = millis();
   digitalWrite(NOTE_PIN1, HIGH);
-  dropTimes[dropIndex] = dropTime;
   gateCloseTask.once_ms(gateTime, gateClose);
   
   ESP_LOGI(LOG_TAG,"GateOpen Time: %d", dropTime);
@@ -186,8 +169,11 @@ void gateClose(){
 
 /* ----- Send Report  ---------------------------------------------- */
 
-void sendDeviation(){
-  ESP_LOGI(LOG_TAG,"Reporting deviation - %d : %d : %d", dropMin, dropMax, deviation);
+void sendReport(){
+  ESP_LOGI(LOG_TAG,"Reporting - min:%d  max:%d  dev:%d dt:%d", dropMin, dropMax, deviation, average );
+  updateDisplay();
+  SymphonyConnection.sendMessage("SET:dropTime=" + String(average));
+  delay(100);
   SymphonyConnection.sendMessage("SET:deviation=" + String(deviation));
 }
 

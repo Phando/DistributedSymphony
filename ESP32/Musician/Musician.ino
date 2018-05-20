@@ -32,18 +32,13 @@ void handleStateChange(String message) {
   if( message == "STOP"){
     displayState = "NONE";
     hasRemote = false;
-  }
-  if( message == "INTRO"){
+  } else if( message == "INTRO"){
     displayState = "NONE";
-  }
-  if( message == "BUILD"){
+  } else if( message == "BUILD"){
     displayState = "URL";
-  }
-  if( message == "MANUAL"){
-  }
-  if( message == "FINALE"){
-  }
-  if( message == "WINNER"){
+  } else if( message == "MANUAL"){
+  } else if( message == "FINALE"){
+  } else if( message == "WINNER"){
   }
 
   state = message;
@@ -85,18 +80,25 @@ void handleMessage(String message) {
 }
 
 /**
- * This callback will be in invoked when the server connection changes
+ * This callback is for team id changes
  */
-void handleChange(String message) {
-  ESP_LOGI(LOG_TAG,"Change: %d", message);
+void onTeamChange(String newTeam) {
+  ESP_LOGI(LOG_TAG,"Change team: %s", newTeam);
+  teamId = newTeam;
+  updateDisplay();
+}
+
+void onKeyChange(String newKey) {
+  ESP_LOGI(LOG_TAG,"Change key: %s", newKey);
+  teamKey = newKey;
   updateDisplay();
 }
 
 /**
  * This callback will be in invoked when the server connection changes
  */
-void handleConnectionChange(bool message) {
-  ESP_LOGI(LOG_TAG,"ConnectionChange: %d", message);
+void handleConnectionChange(bool connectionStatus) {
+  ESP_LOGI(LOG_TAG,"ConnectionChange: %d", connectionStatus);
   updateDisplay();
 }
 
@@ -125,8 +127,8 @@ void setup() {
   SymphonyConnection.start();
   SymphonyConnection.onMessage(handleMessage);
   SymphonyConnection.onChange("state", handleStateChange);
-  SymphonyConnection.onChange("key", handleChange);
-  SymphonyConnection.onChange("team", handleChange);
+  SymphonyConnection.onChange("key", onKeyChange);
+  SymphonyConnection.onChange("team", onTeamChange);
   SymphonyConnection.onConnectionChange(handleConnectionChange);
 
   getGateTime();

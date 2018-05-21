@@ -1,9 +1,10 @@
 
-Ticker gateCloseTask, gateOpenTask;
+Ticker gateCloseTask, gateOpenTask, testTimeoutTask;
 
 #define EPOCH_VALUE 1525910400 // Br the time a 32bit number
+#define TEST_TIMEOUT 5000 // max drop time, in milliseconds.
 
-bool dropTest = false;
+bool lastDropDidTimeout = false;
 
 unsigned long dropMin, dropMax;
 unsigned long dropTime = 0; 
@@ -22,10 +23,23 @@ unsigned long lastTouch2Time = 0;
 
 void beginDropTest(){
   dropTest = true;
+  lastDropDidTimeout = false;
+  testTimeoutTask.detach();
   average = 0;
   dropMax = 0;
   dropMin = 50000;
-  handleMessage("PLAY:1500:0:0:1:2:3:4");
+  testTimeoutTask.once_ms(TEST_TIMEOUT, timeoutDropTest);
+  handleMessage("PLAY:1000:0:0:1:2:3:4");
+}
+
+void timeoutDropTest() {
+  if (!dropTest) {
+    return;
+  }
+  dropTest = false;
+  lastDropDidTimeout = true;
+  ESP_LOGI(LOG_TAG, "Timeout during drop test");
+  updateDisplay();
 }
 
 /* ----- Prepare for Play  ---------------------------------------------- */
@@ -103,7 +117,7 @@ void handleTouch2(){
 
 /* ------------------------------------------------------------------- */
 void handleButton() {
-  if (lastButtonTime > millis() || shouldIgnore()) return;
+  if (lastButtonTime > millis() || shouldIgnore() || dropTest) return;
   lastButtonTime = bounceDelay + millis();
   gateOpen();
 }
@@ -118,6 +132,7 @@ void handleImpact() {
   setAlerting();
 
   if( dropTest ) {
+    testTimeoutTask.detach();
     dropMin = _min(dropMin, dropTime);
     dropMax = _max(dropMax, dropTime);
     average += dropTime;
@@ -132,6 +147,7 @@ void handleImpact() {
     else {
       notes.pop();
       gateOpenTask.once_ms(tempo, gateOpen);
+      testTimeoutTask.once_ms(TEST_TIMEOUT, timeoutDropTest);
     }
   }
 }

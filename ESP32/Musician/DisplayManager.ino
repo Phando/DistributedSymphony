@@ -76,6 +76,9 @@ void updateDisplay(){
     display.setCursor(74,57);
     display.print("Score:" + String(_min(deviation,500)));
   }
+  if(dropTest) {
+    display.fillCircle(display.width()/2.0, display.height() - 3, 3, WHITE);
+  }
   
   display.display();
 }

@@ -17,6 +17,7 @@ unsigned long tempo = 300;
 unsigned long deviation = 0;
 unsigned long gateTime = 100;
 
+bool dropTest = false;
 bool hasRemote = false;
 String displayState = "empty";
 String teamId = "";

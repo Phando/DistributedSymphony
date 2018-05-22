@@ -19,6 +19,7 @@ unsigned long gateTime = 100;
 
 bool dropTest = false;
 bool hasRemote = false;
+bool manualStart = false;
 String displayState = "empty";
 String teamId = "";
 String teamKey = "";

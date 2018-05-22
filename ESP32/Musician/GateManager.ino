@@ -8,7 +8,7 @@ bool lastDropDidTimeout = false;
 
 unsigned long dropMin, dropMax;
 unsigned long dropTime = 0; 
-unsigned long average = -1;
+unsigned long average = 0;
 unsigned long scheduleTime = 0;
 unsigned long startTime = 0;
 
@@ -84,6 +84,9 @@ void beginPlay(char* tokens){
     if( scheduleTime == 0 ) {
       gateOpen();
     }
+    else if( scheduleTime == -1 ) {
+      manualStart = true;
+    }
     else {
       timeval tv = {0,0};
       gettimeofday(&tv, NULL);
@@ -117,6 +120,13 @@ void handleTouch2(){
 
 /* ------------------------------------------------------------------- */
 void handleButton() {
+  if (manualStart){
+    manualStart = false;
+    scheduleTime = 5000 - average;
+    startTime = millis() + scheduleTime;
+    gateOpenTask.once_ms(scheduleTime, gateOpen);
+    return;
+  }
   if (lastButtonTime > millis() || shouldIgnore() || dropTest) return;
   lastButtonTime = bounceDelay + millis();
   gateOpen();
@@ -164,7 +174,9 @@ void gateOpen(){
   
   if( !notes.isEmpty() && !dropTest ){
     int nextNote = notes.pop();
-    gateOpenTask.once_ms((startTime-dropTime)+nextNote*tempo, gateOpen);
+    int nextMillis = (startTime-dropTime)+nextNote*tempo;
+    ESP_LOGI(LOG_TAG,"next open time: %d", nextMillis);
+    gateOpenTask.once_ms(nextMillis, gateOpen);
   }
 }
 

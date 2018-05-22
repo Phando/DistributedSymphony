@@ -126,6 +126,7 @@ void setup() {
 
   ESP_LOGI(LOG_TAG,"Connecting to Symphony");
   SymphonyConnection.start();
+  WifiConnection.setCredentials("desertvista", "cloudboard");
   SymphonyConnection.onMessage(handleMessage);
   SymphonyConnection.onChange("state", handleStateChange);
   SymphonyConnection.onChange("key", onKeyChange);

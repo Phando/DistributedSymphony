@@ -30,8 +30,12 @@ Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 //#define SERVICE_SSID        "Rachel's Network"
 //#define SERVICE_PASS        "photoshop!"
 
-#define SERVICE_SSID        "Verizon-MiFi6620L-D537"
-#define SERVICE_PASS        "a71745e9"
+//#define SERVICE_SSID        "Verizon-MiFi6620L-D537"
+//#define SERVICE_PASS        "a71745e9"
+
+#define SERVICE_SSID        "desertvista"
+#define SERVICE_PASS        "cloudboard"
+
 
 #define CHAR_MAX 9
 int charCount = 0;
